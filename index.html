@@ -18,10 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-    <!-- Librerías de Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- (Se han eliminado las librerías de Firebase de aquí) -->
 
     <style>
         /* ==========================================================================
@@ -115,19 +112,6 @@
         .tarjeta-logout:active { background-color: rgba(239, 68, 68, 0.1); }
         .texto-logout { font-size: 1rem; font-weight: 700; color: #ef4444; transition: color 0.3s ease; }
 
-        /* PANTALLA DE LOGIN / REGISTRO */
-        .pantalla-login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--color-fondo); z-index: 2000; display: flex; align-items: center; justify-content: center; transition: opacity 0.4s ease; opacity: 0; pointer-events: none; }
-        .pantalla-login-overlay.activa { opacity: 1; pointer-events: auto; }
-        .tarjeta-login { background-color: var(--color-tarjeta); width: 90%; max-width: 360px; border-radius: 24px; padding: 40px 24px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid var(--color-borde); transition: background-color 0.3s ease, border-color 0.3s ease; }
-        .titulo-login { font-size: 2.5rem; font-weight: 800; color: var(--color-acento-azul); margin-bottom: 8px; letter-spacing: -1px;}
-        .subtitulo-login { font-size: 0.95rem; color: var(--color-texto-secundario); margin-bottom: 30px; transition: color 0.3s ease;}
-        .input-login { width: 100%; padding: 14px 16px; margin-bottom: 16px; border-radius: 12px; border: 1px solid var(--color-borde); background-color: var(--color-fondo); color: var(--color-texto-principal); font-size: 1rem; transition: all 0.2s ease; }
-        .input-login:focus { border-color: var(--color-acento-azul); outline: none; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
-        .btn-login-principal { width: 100%; padding: 14px; border-radius: 12px; background-color: var(--color-acento-azul); color: white; border: none; font-size: 1.05rem; font-weight: 700; cursor: pointer; margin-top: 8px; transition: transform 0.1s ease; }
-        .btn-login-principal:active { transform: scale(0.97); }
-        .texto-cambio-modo { margin-top: 24px; font-size: 0.9rem; color: var(--color-texto-secundario); transition: color 0.3s ease;}
-        .btn-enlace { background: none; border: none; color: var(--color-acento-azul); font-weight: 600; cursor: pointer; padding: 0 4px; font-size: 0.9rem;}
-
         /* MODO ZOOM Y ESTADÍSTICAS DETALLE */
         .modo-zoom-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; z-index: 500; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
         .modo-zoom-overlay.activo { opacity: 1; pointer-events: auto; }
@@ -169,24 +153,6 @@
     </style>
 </head>
 <body>
-
-    <!-- OVERLAY DE LOGIN Y REGISTRO -->
-    <div id="pantalla-login" class="pantalla-login-overlay activa">
-        <div class="tarjeta-login">
-            <h1 class="titulo-login">Atlas</h1>
-            <p class="subtitulo-login" id="login-subtitulo">Inicia sesión para guardar tus viajes</p>
-
-            <input type="email" id="login-email" class="input-login" placeholder="Correo electrónico" autocomplete="email">
-            <input type="password" id="login-password" class="input-login" placeholder="Contraseña">
-
-            <button id="btn-login-submit" class="btn-login-principal">Entrar</button>
-
-            <p class="texto-cambio-modo">
-                <span id="texto-pregunta-login">¿No tienes cuenta?</span>
-                <button id="btn-cambiar-modo-login" class="btn-enlace">Regístrate</button>
-            </p>
-        </div>
-    </div>
 
     <!-- CABECERA -->
     <header class="header-app">
@@ -234,9 +200,10 @@
                     </div>
                     <label class="switch-toggle"><input type="checkbox" id="toggle-modo-oscuro"><span class="slider-toggle"></span></label>
                 </div>
-                <div id="btn-cerrar-sesion" class="tarjeta-ajuste tarjeta-logout">
-                    <span class="texto-logout">Cerrar sesión</span>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="#ef4444"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                <!-- Botón de borrar datos locales sustituyendo al de cerrar sesión -->
+                <div id="btn-borrar-datos" class="tarjeta-ajuste tarjeta-logout">
+                    <span class="texto-logout">Borrar mis datos</span>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="#ef4444"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </div>
             </div>
         </section>
@@ -273,22 +240,6 @@
     <script src="mapa.js"></script>
 
     <script>
-        /* === CONEXIÓN A FIREBASE === */
-        const firebaseConfig = {
-        apiKey: "",
-         authDomain: "atlas-2871d.firebaseapp.com",
-         projectId: "atlas-2871d",
-        storageBucket: "atlas-2871d.firebasestorage.app",
-         messagingSenderId: "1079031314692",
-        appId: "1:1079031314692:web:1af99382f2f78064c7f851",
-        measurementId: "G-Y2R594JY4V"
-        };
-
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
         /* === DICCIONARIO DE CONTINENTES === */
         const MAPA_CONTINENTES = {
             "AF": "Asia", "AL": "Europa", "DE": "Europa", "AD": "Europa", "AO": "África", "AG": "América", "SA": "Asia", "DZ": "África", "AR": "América", "AM": "Asia", "AU": "Oceanía", "AT": "Europa", "AZ": "Asia", "BS": "América", "BD": "Asia", "BB": "América", "BH": "Asia", "BE": "Europa", "BZ": "América", "BJ": "África", "BY": "Europa", "MM": "Asia", "BO": "América", "BA": "Europa", "BW": "África", "BR": "América", "BN": "Asia", "BG": "Europa", "BF": "África", "BI": "África", "BT": "Asia", "CV": "África", "KH": "Asia", "CM": "África", "CA": "América", "QA": "Asia", "TD": "África", "CL": "América", "CN": "Asia", "CY": "Europa", "VA": "Europa", "CO": "América", "KM": "África", "KP": "Asia", "KR": "Asia", "CI": "África", "CR": "América", "HR": "Europa", "CU": "América", "DK": "Europa", "DM": "América", "EC": "América", "EG": "África", "SV": "América", "AE": "Asia", "ER": "África", "SK": "Europa", "SI": "Europa", "ES": "Europa", "US": "América", "EE": "Europa", "ET": "África", "PH": "Asia", "FI": "Europa", "FJ": "Oceanía", "FR": "Europa", "GA": "África", "GM": "África", "GE": "Asia", "GH": "África", "GD": "América", "GR": "Europa", "GT": "América", "GN": "África", "GQ": "África", "GW": "África", "GY": "América", "HT": "América", "HN": "América", "HU": "Europa", "IN": "Asia", "ID": "Asia", "IQ": "Asia", "IR": "Asia", "IE": "Europa", "IS": "Europa", "IL": "Asia", "IT": "Europa", "JM": "América", "JP": "Asia", "JO": "Asia", "KZ": "Asia", "KE": "África", "KG": "Asia", "KI": "Oceanía", "KW": "Asia", "LA": "Asia", "LS": "África", "LV": "Europa", "LB": "Asia", "LR": "África", "LY": "África", "LI": "Europa", "LT": "Europa", "LU": "Europa", "MK": "Europa", "MG": "África", "MY": "Asia", "MW": "África", "MV": "Asia", "ML": "África", "MT": "Europa", "MA": "África", "MU": "África", "MR": "África", "MX": "América", "FM": "Oceanía", "MD": "Europa", "MC": "Europa", "MN": "Asia", "ME": "Europa", "MZ": "África", "NA": "África", "NR": "Oceanía", "NP": "Asia", "NI": "América", "NE": "África", "NG": "África", "NO": "Europa", "NZ": "Oceanía", "OM": "Asia", "NL": "Europa", "PK": "Asia", "PW": "Oceanía", "PA": "América", "PG": "Oceanía", "PY": "América", "PE": "América", "PL": "Europa", "PT": "Europa", "GB": "Europa", "CF": "África", "CZ": "Europa", "CG": "África", "CD": "África", "DO": "América", "RW": "África", "RO": "Europa", "RU": "Europa", "WS": "Oceanía", "KN": "América", "SM": "Europa", "VC": "América", "LC": "América", "ST": "África", "SN": "África", "RS": "Europa", "SC": "África", "SL": "África", "SG": "Asia", "SY": "Asia", "SO": "África", "LK": "Asia", "SZ": "África", "ZA": "África", "SD": "África", "SS": "África", "SE": "Europa", "CH": "Europa", "SR": "América", "TH": "Asia", "TZ": "África", "TJ": "Asia", "TL": "Asia", "TG": "África", "TO": "Oceanía", "TT": "América", "TN": "África", "TM": "Asia", "TR": "Asia", "TV": "Oceanía", "UA": "Europa", "UG": "África", "UY": "América", "UZ": "Asia", "VU": "Oceanía", "VE": "América", "VN": "Asia", "YE": "Asia", "DJ": "África", "ZM": "África", "ZW": "África"
@@ -298,10 +249,10 @@
         let listaPaisesGlobal = [];
         let ordenContinentes = ['Europa', 'Asia', 'América', 'África', 'Oceanía'];
         let ordenarVisitadosPrimero = false; 
-        let modoRegistro = false; 
 
         const CLAVE_ORDEN_CONTINENTES = 'atlas_orden_continentes_v1';
         const CLAVE_MODO_OSCURO = 'atlas_modo_oscuro_v1';
+        const CLAVE_DATOS_VISITADOS = 'atlas_paises_visitados_v1'; // Clave para guardar en LocalStorage
 
         /* === EVENTOS INICIALES === */
         document.addEventListener('DOMContentLoaded', () => {
@@ -311,117 +262,65 @@
             configurarEventosBusqueda();
             configurarEventosZoom();
             configurarPantallaContinentes();
-            configurarEventosLogin();
+            configurarBotonBorrarDatos();
             
-            // Vigilar si el usuario entra o sale
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    document.getElementById('pantalla-login').classList.remove('activa');
-                    cargarDatosDesdeNube(user.uid);
-                } else {
-                    document.getElementById('pantalla-login').classList.add('activa');
-                    listaPaisesGlobal = []; 
-                }
-            });
+            // Cargar datos locales directamente al entrar
+            cargarDatosLocales();
         });
 
-        /* === LÓGICA DE FIREBASE (NUBE) === */
-        function cargarDatosDesdeNube(uid) {
+        /* === LÓGICA DE DATOS (LOCALSTORAGE) === */
+        function cargarDatosLocales() {
             const basePaises = (typeof PAISES_BASE !== 'undefined') ? PAISES_BASE : [];
+            let idsVisitados = [];
             
-            db.collection('usuarios').doc(uid).get().then((doc) => {
-                let idsVisitados = [];
-                if (doc.exists && doc.data().visitados) {
-                    idsVisitados = doc.data().visitados;
+            const guardado = localStorage.getItem(CLAVE_DATOS_VISITADOS);
+            if (guardado) {
+                try {
+                    idsVisitados = JSON.parse(guardado);
+                } catch (e) {
+                    console.error("Error leyendo datos locales", e);
                 }
+            }
 
-                listaPaisesGlobal = basePaises.map(p => ({
-                    ...p,
-                    visitado: idsVisitados.includes(p.id),
-                    continente: MAPA_CONTINENTES[p.id] || "Otro"
-                }));
-                listaPaisesGlobal.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+            listaPaisesGlobal = basePaises.map(p => ({
+                ...p,
+                visitado: idsVisitados.includes(p.id),
+                continente: MAPA_CONTINENTES[p.id] || "Otro"
+            }));
+            listaPaisesGlobal.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
-                const ordenJSON = localStorage.getItem(CLAVE_ORDEN_CONTINENTES);
-                if (ordenJSON) {
-                    try { ordenContinentes = JSON.parse(ordenJSON); } catch (e) {}
-                }
+            const ordenJSON = localStorage.getItem(CLAVE_ORDEN_CONTINENTES);
+            if (ordenJSON) {
+                try { ordenContinentes = JSON.parse(ordenJSON); } catch (e) {}
+            }
 
-                actualizarInterfaceCompleta();
-            }).catch((error) => {
-                console.error("Error cargando países:", error);
-                alert("Hubo un error cargando tus datos.");
-            });
+            actualizarInterfaceCompleta();
         }
 
-        function guardarDatosEnNube() {
-            const user = auth.currentUser;
-            if (user) {
-                const idsVisitados = listaPaisesGlobal.filter(p => p.visitado).map(p => p.id);
-                db.collection('usuarios').doc(user.uid).set({
-                    visitados: idsVisitados
-                }, { merge: true }).catch((error) => {
-                    console.error("Error guardando:", error);
-                });
-            }
+        function guardarDatosLocales() {
+            const idsVisitados = listaPaisesGlobal.filter(p => p.visitado).map(p => p.id);
+            localStorage.setItem(CLAVE_DATOS_VISITADOS, JSON.stringify(idsVisitados));
         }
 
         function cambiarEstadoPais(idPais) {
             const pais = listaPaisesGlobal.find(p => p.id === idPais);
             if (pais) {
                 pais.visitado = !pais.visitado;
-                guardarDatosEnNube(); // Ahora guardamos en Firebase
+                guardarDatosLocales(); 
                 actualizarInterfaceCompleta();
             }
         }
-
-        /* === LÓGICA DE LOGIN Y REGISTRO === */
-        function configurarEventosLogin() {
-            const btnSubmit = document.getElementById('btn-login-submit');
-            const btnCambiar = document.getElementById('btn-cambiar-modo-login');
-            const emailInput = document.getElementById('login-email');
-            const passInput = document.getElementById('login-password');
-
-            btnCambiar.addEventListener('click', () => {
-                modoRegistro = !modoRegistro;
-                if (modoRegistro) {
-                    btnSubmit.textContent = "Crear cuenta";
-                    document.getElementById('login-subtitulo').textContent = "Crea una cuenta nueva para empezar";
-                    document.getElementById('texto-pregunta-login').textContent = "¿Ya tienes cuenta?";
-                    btnCambiar.textContent = "Inicia sesión";
-                } else {
-                    btnSubmit.textContent = "Entrar";
-                    document.getElementById('login-subtitulo').textContent = "Inicia sesión para guardar tus viajes";
-                    document.getElementById('texto-pregunta-login').textContent = "¿No tienes cuenta?";
-                    btnCambiar.textContent = "Regístrate";
-                }
-            });
-
-            btnSubmit.addEventListener('click', () => {
-                const email = emailInput.value.trim();
-                const password = passInput.value.trim();
-
-                if (!email || !password) return alert("Por favor, rellena tu correo y contraseña.");
-
-                if (modoRegistro) {
-                    auth.createUserWithEmailAndPassword(email, password)
-                        .catch((error) => alert("Error al registrar: " + error.message));
-                } else {
-                    auth.signInWithEmailAndPassword(email, password)
-                        .catch((error) => alert("Error al entrar: Correo o contraseña incorrectos."));
-                }
-            });
-
-            // Lógica Cerrar Sesión
-            document.getElementById('btn-cerrar-sesion').addEventListener('click', () => {
-                if (confirm("¿Estás seguro de que quieres cerrar la sesión?")) {
-                    auth.signOut().then(() => {
-                        cambiarPestaña('mapa');
-                        emailInput.value = '';
-                        passInput.value = '';
-                    });
-                }
-            });
+        
+        function configurarBotonBorrarDatos() {
+            const btnBorrar = document.getElementById('btn-borrar-datos');
+            if (btnBorrar) {
+                btnBorrar.addEventListener('click', () => {
+                    if (confirm("¿Estás seguro de que quieres borrar todos los países que has marcado? Esta acción no se puede deshacer.")) {
+                        localStorage.removeItem(CLAVE_DATOS_VISITADOS);
+                        cargarDatosLocales(); // Recargar la app vacía
+                    }
+                });
+            }
         }
 
         /* === LÓGICA VISUAL (MODO OSCURO, ETC) === */

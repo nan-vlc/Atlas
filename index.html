@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atlas</title>
+    
+    <!-- PWA y Soporte para iOS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Atlas">
+    <link rel="apple-touch-icon" href="icono.jpg">
+
+    <!-- Librerías externas -->
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <!-- Librerías de Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        /* ==========================================================================
+           1. VARIABLES GLOBALES (MODO CLARO POR DEFECTO)
+           ========================================================================== */
+        :root {
+            --color-fondo: #f8fafc;
+            --color-tarjeta: #ffffff;
+            --color-texto-principal: #0f172a;
+            --color-texto-secundario: #64748b;
+            --color-acento-azul: #0ea5e9;
+            --color-acento-hover: #0284c7;
+            --color-no-visitado: #cbd5e1;
+            --color-borde: #e2e8f0;
+            --color-inactivo: #94a3b8;
+            --header-altura: 60px;
+            --nav-inferior-altura: 80px;
+            --fuente-app: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        /* === MODO OSCURO === */
+        body.dark-mode {
+            --color-fondo: #0f172a;
+            --color-tarjeta: #1e293b;
+            --color-texto-principal: #f8fafc;
+            --color-texto-secundario: #94a3b8;
+            --color-no-visitado: #334155;
+            --color-borde: #334155;
+            --color-inactivo: #475569;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: var(--fuente-app); background-color: var(--color-fondo); color: var(--color-texto-principal); display: flex; flex-direction: column; height: 100vh; overflow: hidden; user-select: none; transition: background-color 0.3s ease, color 0.3s ease; }
+
+        /* HEADER */
+        .header-app { position: fixed; top: 0; left: 0; right: 0; height: var(--header-altura); background-color: var(--color-tarjeta); border-bottom: 1px solid var(--color-borde); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 100; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .header-titulo { font-size: 1.8rem; font-weight: 800; color: var(--color-acento-azul); letter-spacing: -0.5px; }
+        .btn-icono-header { background: none; border: none; color: var(--color-texto-secundario); cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+        .btn-icono-header:active { background-color: var(--color-fondo); color: var(--color-acento-azul); }
+        .btn-icono-header svg { width: 24px; height: 24px; fill: currentColor; }
+
+        /* CONTENEDOR PRINCIPAL */
+        .contenedor-pantallas { margin-top: var(--header-altura); margin-bottom: var(--nav-inferior-altura); height: calc(100vh - var(--header-altura) - var(--nav-inferior-altura)); position: relative; overflow: hidden; }
+        .pantalla { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; background-color: var(--color-fondo); transition: background-color 0.3s ease; }
+        .pantalla.activa { display: flex; }
+
+        /* PANTALLA MAPA */
+        .contenedor-mapa-estatico { height: 50%; width: 100%; background-color: var(--color-fondo); border-bottom: 1px solid var(--color-borde); position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .svg-wrapper-estatico { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .svg-wrapper-estatico svg { width: 100%; height: 100%; max-height: 100%; object-fit: contain; transform: scale(1.1) translateY(20%); }
+
+        .contenedor-estadisticas { height: 50%; width: 100%; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: var(--color-fondo); transition: background-color 0.3s ease; }
+        .panel-metricas-wrapper { width: 100%; max-width: 400px; display: flex; align-items: center; justify-content: space-around; background-color: var(--color-tarjeta); padding: 30px 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); border: 1px solid var(--color-borde); cursor: pointer; transition: transform 0.1s ease, background-color 0.3s ease, border-color 0.3s ease; }
+        .panel-metricas-wrapper:active { transform: scale(0.97); }
+        .bloque-metrica { display: flex; flex-direction: column; align-items: center; text-align: center; flex: 1; }
+        .valor-metrica { font-size: 2.2rem; font-weight: 800; color: var(--color-texto-principal); transition: color 0.3s ease;}
+        .etiqueta-metrica { font-size: 0.95rem; color: var(--color-texto-secundario); margin-top: 6px; font-weight: 500; transition: color 0.3s ease;}
+        .grafico-pie-container { position: relative; width: 120px; height: 120px; margin: 0 15px; }
+        .grafico-pie { width: 100%; height: 100%; border-radius: 50%; background: conic-gradient(var(--color-acento-azul) 0deg 0deg, var(--color-no-visitado) 0deg 360deg); display: flex; align-items: center; justify-content: center; transition: background 0.4s ease; }
+        .grafico-pie-cuerpo-interno { width: 94px; height: 94px; background-color: var(--color-tarjeta); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background-color 0.3s ease; }
+        .grafico-pie-icono { width: 32px; height: 32px; fill: var(--color-acento-azul); }
+
+        /* PANTALLA LISTA */
+        .contenedor-busqueda { padding: 16px 20px 12px 20px; background-color: var(--color-tarjeta); border-bottom: 1px solid var(--color-borde); display: flex; gap: 12px; align-items: center; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .wrapper-input-busqueda { position: relative; flex: 1; display: flex; align-items: center; }
+        .campo-busqueda-input { width: 100%; padding: 12px 40px 12px 16px; border-radius: 12px; border: 1px solid var(--color-borde); background-color: var(--color-fondo); font-size: 0.95rem; color: var(--color-texto-principal); outline: none; transition: background-color 0.3s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.3s ease;}
+        .campo-busqueda-input:focus { border-color: var(--color-acento-azul); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
+        .btn-limpiar-busqueda { position: absolute; right: 12px; background: none; border: none; color: var(--color-inactivo); cursor: pointer; display: none; align-items: center; justify-content: center; padding: 4px; }
+        .btn-ordenar-lista { background-color: var(--color-fondo); border: 1px solid var(--color-borde); border-radius: 12px; padding: 10px; color: var(--color-texto-secundario); cursor: pointer; display: flex; transition: all 0.2s ease; }
+        .btn-ordenar-lista.activo { background-color: var(--color-acento-azul); color: white; border-color: var(--color-acento-azul); }
+        .lista-paises-scroll { list-style: none; overflow-y: auto; flex: 1; padding: 8px 20px 20px 20px; }
+        .item-pais { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; margin-top: 8px; background-color: var(--color-tarjeta); border: 1px solid var(--color-borde); border-radius: 12px; cursor: pointer; transition: transform 0.1s ease, background-color 0.3s ease, border-color 0.3s ease; }
+        .item-pais:active { transform: scale(0.98); }
+        .nombre-pais { font-size: 0.95rem; font-weight: 500; color: var(--color-texto-principal); transition: color 0.3s ease;}
+        .badge-estado { padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+        .badge-estado.estado-visited { background-color: var(--color-acento-azul); color: #ffffff; border: 1px solid var(--color-acento-azul); }
+
+        /* PANTALLA AJUSTES */
+        .header-ajustes { padding: 20px 20px 0 20px; }
+        .header-ajustes h2 { font-size: 1.5rem; color: var(--color-texto-principal); font-weight: 800; transition: color 0.3s ease; }
+        .contenido-ajustes { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+        .tarjeta-ajuste { background-color: var(--color-tarjeta); border: 1px solid var(--color-borde); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .switch-toggle { position: relative; display: inline-block; width: 50px; height: 28px; flex-shrink: 0; }
+        .switch-toggle input { opacity: 0; width: 0; height: 0; }
+        .slider-toggle { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--color-inactivo); transition: .4s; border-radius: 34px; }
+        .slider-toggle:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        input:checked + .slider-toggle { background-color: var(--color-acento-azul); }
+        input:checked + .slider-toggle:before { transform: translateX(22px); }
+        
+        .tarjeta-logout { background-color: transparent; border: 1px solid #ef4444; cursor: pointer; }
+        .tarjeta-logout:active { background-color: rgba(239, 68, 68, 0.1); }
+        .texto-logout { font-size: 1rem; font-weight: 700; color: #ef4444; transition: color 0.3s ease; }
+
+        /* PANTALLA DE LOGIN / REGISTRO */
+        .pantalla-login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--color-fondo); z-index: 2000; display: flex; align-items: center; justify-content: center; transition: opacity 0.4s ease; opacity: 0; pointer-events: none; }
+        .pantalla-login-overlay.activa { opacity: 1; pointer-events: auto; }
+        .tarjeta-login { background-color: var(--color-tarjeta); width: 90%; max-width: 360px; border-radius: 24px; padding: 40px 24px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid var(--color-borde); transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .titulo-login { font-size: 2.5rem; font-weight: 800; color: var(--color-acento-azul); margin-bottom: 8px; letter-spacing: -1px;}
+        .subtitulo-login { font-size: 0.95rem; color: var(--color-texto-secundario); margin-bottom: 30px; transition: color 0.3s ease;}
+        .input-login { width: 100%; padding: 14px 16px; margin-bottom: 16px; border-radius: 12px; border: 1px solid var(--color-borde); background-color: var(--color-fondo); color: var(--color-texto-principal); font-size: 1rem; transition: all 0.2s ease; }
+        .input-login:focus { border-color: var(--color-acento-azul); outline: none; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
+        .btn-login-principal { width: 100%; padding: 14px; border-radius: 12px; background-color: var(--color-acento-azul); color: white; border: none; font-size: 1.05rem; font-weight: 700; cursor: pointer; margin-top: 8px; transition: transform 0.1s ease; }
+        .btn-login-principal:active { transform: scale(0.97); }
+        .texto-cambio-modo { margin-top: 24px; font-size: 0.9rem; color: var(--color-texto-secundario); transition: color 0.3s ease;}
+        .btn-enlace { background: none; border: none; color: var(--color-acento-azul); font-weight: 600; cursor: pointer; padding: 0 4px; font-size: 0.9rem;}
+
+        /* MODO ZOOM Y ESTADÍSTICAS DETALLE */
+        .modo-zoom-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; z-index: 500; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .modo-zoom-overlay.activo { opacity: 1; pointer-events: auto; }
+        .btn-flotante-atras { position: absolute; top: 20px; left: 20px; z-index: 510; background-color: var(--color-tarjeta); border: none; padding: 10px 16px; border-radius: 25px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9rem; color: var(--color-texto-principal); cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); opacity: 0.95; transition: background-color 0.3s ease, color 0.3s ease; }
+        .btn-flotante-atras svg { width: 18px; height: 18px; fill: currentColor; }
+        .wrapper-mapa-zoom-fullscreen { width: 100%; height: 100%; overflow: hidden; position: relative; }
+        .wrapper-mapa-zoom-fullscreen svg { width: 100%; height: 100%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); object-fit: contain; }
+
+        .pantalla-estadisticas-detalle { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: var(--color-fondo); z-index: 400; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.3s ease; }
+        .pantalla-estadisticas-detalle.activa { transform: translateX(0); }
+        .header-detalle { height: var(--header-altura); background-color: var(--color-tarjeta); border-bottom: 1px solid var(--color-borde); display: flex; align-items: center; padding: 0 10px; flex-shrink: 0; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .btn-atras-texto { background: none; border: none; font-size: 1rem; color: var(--color-acento-azul); font-weight: 500; display: flex; align-items: center; padding: 10px; cursor: pointer; }
+        .btn-atras-texto svg { width: 22px; height: 22px; margin-right: 4px; fill: currentColor; }
+        .titulo-detalle { flex: 1; text-align: center; font-size: 1.1rem; font-weight: 700; margin-right: 40px; color: var(--color-texto-principal); transition: color 0.3s ease;}
+        .contenido-estadisticas-scroll { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 40px; display: flex; flex-direction: column; gap: 24px; }
+        
+        .lista-continentes { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+        .tarjeta-continente { background-color: var(--color-tarjeta); border: 1px solid var(--color-borde); border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .tarjeta-continente.sortable-ghost { opacity: 0.4; } 
+        .drag-handle { color: var(--color-inactivo); padding: 8px; cursor: grab; transition: color 0.3s ease;}
+        .drag-handle:active { cursor: grabbing; }
+        .continente-info { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .continente-header { display: flex; justify-content: space-between; align-items: flex-end; }
+        .continente-nombre { font-size: 1.1rem; font-weight: 700; color: var(--color-texto-principal); transition: color 0.3s ease;}
+        .continente-fraccion { font-size: 0.85rem; color: var(--color-texto-secundario); font-weight: 500; transition: color 0.3s ease;}
+        .continente-porcentaje { font-size: 1.1rem; font-weight: 800; color: var(--color-acento-azul); }
+        .barra-progreso-bg { width: 100%; height: 10px; background-color: var(--color-no-visitado); border-radius: 10px; overflow: hidden; transition: background-color 0.3s ease;}
+        .barra-progreso-fill { height: 100%; background-color: var(--color-acento-azul); border-radius: 10px; transition: width 0.5s ease; }
+
+        /* NAVEGACIÓN INFERIOR */
+        .barra-navegacion-inferior { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-inferior-altura); background-color: var(--color-tarjeta); border-top: 1px solid var(--color-borde); display: flex; align-items: center; justify-content: space-around; z-index: 100; transition: background-color 0.3s ease, border-color 0.3s ease; }
+        .nav-item-btn { background: none; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--color-inactivo); width: 50%; height: 100%; cursor: pointer; transition: color 0.3s ease;}
+        .nav-item-btn.activo { color: var(--color-acento-azul); }
+        .nav-item-btn svg { width: 28px; height: 28px; fill: currentColor; margin-bottom: 6px; }
+        .nav-etiqueta { font-size: 0.9rem; font-weight: 600; }
+
+        .pais-svg { fill: var(--color-no-visitado); stroke: var(--color-fondo) !important; stroke-width: 1.5; transition: fill 0.3s ease, stroke 0.3s ease; }
+        .pais-svg.visitado { fill: var(--color-acento-azul); }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY DE LOGIN Y REGISTRO -->
+    <div id="pantalla-login" class="pantalla-login-overlay activa">
+        <div class="tarjeta-login">
+            <h1 class="titulo-login">Atlas</h1>
+            <p class="subtitulo-login" id="login-subtitulo">Inicia sesión para guardar tus viajes</p>
+
+            <input type="email" id="login-email" class="input-login" placeholder="Correo electrónico" autocomplete="email">
+            <input type="password" id="login-password" class="input-login" placeholder="Contraseña">
+
+            <button id="btn-login-submit" class="btn-login-principal">Entrar</button>
+
+            <p class="texto-cambio-modo">
+                <span id="texto-pregunta-login">¿No tienes cuenta?</span>
+                <button id="btn-cambiar-modo-login" class="btn-enlace">Regístrate</button>
+            </p>
+        </div>
+    </div>
+
+    <!-- CABECERA -->
+    <header class="header-app">
+        <h1 class="header-titulo">Atlas</h1>
+        <button id="btn-ajustes" class="btn-icono-header">
+            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+    </header>
+
+    <main class="contenedor-pantallas">
+        <!-- PESTAÑA MAPA -->
+        <section id="pantalla-mapa" class="pantalla activa">
+            <div id="btn-abrir-zoom" class="contenedor-mapa-estatico">
+                <div id="svg-mapa-estatico-wrapper" class="svg-wrapper-estatico"></div>
+            </div>
+            <div class="contenedor-estadisticas">
+                <div id="btn-abrir-stats-continentes" class="panel-metricas-wrapper">
+                    <div class="bloque-metrica"><span id="metrica-total-visitados" class="valor-metrica">0</span><span class="etiqueta-metrica">Visitados</span></div>
+                    <div class="grafico-pie-container"><div id="grafico-pie" class="grafico-pie"><div class="grafico-pie-cuerpo-interno"><svg class="grafico-pie-icono" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div></div></div>
+                    <div class="bloque-metrica"><span id="metrica-porcentaje-visitados" class="valor-metrica">0%</span><span class="etiqueta-metrica">Del Mundo</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PESTAÑA LISTA -->
+        <section id="pantalla-lista" class="pantalla">
+            <div class="contenedor-busqueda">
+                <div class="wrapper-input-busqueda">
+                    <input type="text" id="input-busqueda-pais" class="campo-busqueda-input" placeholder="Buscar país..." autocomplete="off">
+                    <button id="btn-limpiar-busqueda" class="btn-limpiar-busqueda"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+                </div>
+                <button id="btn-ordenar-lista" class="btn-ordenar-lista"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg></button>
+            </div>
+            <ul id="lista-paises-ul" class="lista-paises-scroll"></ul>
+        </section>
+
+        <!-- PESTAÑA AJUSTES -->
+        <section id="pantalla-ajustes" class="pantalla">
+            <div class="header-ajustes"><h2>Ajustes</h2></div>
+            <div class="contenido-ajustes">
+                <div class="tarjeta-ajuste">
+                    <div style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
+                        <span style="font-size: 1rem; font-weight: 600; color: var(--color-texto-principal); transition: color 0.3s ease;">Modo Oscuro</span>
+                        
+                    </div>
+                    <label class="switch-toggle"><input type="checkbox" id="toggle-modo-oscuro"><span class="slider-toggle"></span></label>
+                </div>
+                <div id="btn-cerrar-sesion" class="tarjeta-ajuste tarjeta-logout">
+                    <span class="texto-logout">Cerrar sesión</span>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="#ef4444"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ESTADÍSTICAS POR CONTINENTE -->
+    <div id="pantalla-estadisticas-detalle" class="pantalla-estadisticas-detalle">
+        <header class="header-detalle">
+            <button id="btn-cerrar-stats-continentes" class="btn-atras-texto"><svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg> Atrás</button>
+            <h2 class="titulo-detalle">Estadísticas</h2>
+        </header>
+        <div class="contenido-estadisticas-scroll">
+            <div class="panel-metricas-wrapper" style="cursor: default; transform: none; box-shadow: none; margin: 0 auto;">
+                <div class="bloque-metrica"><span id="metrica-total-visitados-clon" class="valor-metrica">0</span><span class="etiqueta-metrica">Visitados</span></div>
+                <div class="grafico-pie-container"><div id="grafico-pie-clon" class="grafico-pie"><div class="grafico-pie-cuerpo-interno"><svg class="grafico-pie-icono" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div></div></div>
+                <div class="bloque-metrica"><span id="metrica-porcentaje-visitados-clon" class="valor-metrica">0%</span><span class="etiqueta-metrica">Del Mundo</span></div>
+            </div>
+            <ul id="lista-continentes-drag" class="lista-continentes"></ul>
+        </div>
+    </div>
+
+    <!-- MODO ZOOM -->
+    <div id="modo-zoom-overlay" class="modo-zoom-overlay">
+        <button id="btn-cerrar-zoom" class="btn-flotante-atras"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Atrás</button>
+        <div id="wrapper-mapa-zoom" class="wrapper-mapa-zoom-fullscreen"></div>
+    </div>
+
+    <!-- BARRA NAVEGACIÓN -->
+    <nav class="barra-navegacion-inferior" id="barra-navegacion">
+        <button id="nav-btn-map" class="nav-item-btn activo"><svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg><span class="nav-etiqueta">Map</span></button>
+        <button id="nav-btn-list" class="nav-item-btn"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg><span class="nav-etiqueta">List</span></button>
+    </nav>
+
+    <script src="mapa.js"></script>
+
+    <script>
+        /* === CONEXIÓN A FIREBASE === */
+        const firebaseConfig = {
+        apiKey: "AIzaSyC9LiufFWyIuXGZh2YGfiFMq0soELoE418",
+         authDomain: "atlas-2871d.firebaseapp.com",
+         projectId: "atlas-2871d",
+        storageBucket: "atlas-2871d.firebasestorage.app",
+         messagingSenderId: "1079031314692",
+        appId: "1:1079031314692:web:1af99382f2f78064c7f851",
+        measurementId: "G-Y2R594JY4V"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        /* === DICCIONARIO DE CONTINENTES === */
+        const MAPA_CONTINENTES = {
+            "AF": "Asia", "AL": "Europa", "DE": "Europa", "AD": "Europa", "AO": "África", "AG": "América", "SA": "Asia", "DZ": "África", "AR": "América", "AM": "Asia", "AU": "Oceanía", "AT": "Europa", "AZ": "Asia", "BS": "América", "BD": "Asia", "BB": "América", "BH": "Asia", "BE": "Europa", "BZ": "América", "BJ": "África", "BY": "Europa", "MM": "Asia", "BO": "América", "BA": "Europa", "BW": "África", "BR": "América", "BN": "Asia", "BG": "Europa", "BF": "África", "BI": "África", "BT": "Asia", "CV": "África", "KH": "Asia", "CM": "África", "CA": "América", "QA": "Asia", "TD": "África", "CL": "América", "CN": "Asia", "CY": "Europa", "VA": "Europa", "CO": "América", "KM": "África", "KP": "Asia", "KR": "Asia", "CI": "África", "CR": "América", "HR": "Europa", "CU": "América", "DK": "Europa", "DM": "América", "EC": "América", "EG": "África", "SV": "América", "AE": "Asia", "ER": "África", "SK": "Europa", "SI": "Europa", "ES": "Europa", "US": "América", "EE": "Europa", "ET": "África", "PH": "Asia", "FI": "Europa", "FJ": "Oceanía", "FR": "Europa", "GA": "África", "GM": "África", "GE": "Asia", "GH": "África", "GD": "América", "GR": "Europa", "GT": "América", "GN": "África", "GQ": "África", "GW": "África", "GY": "América", "HT": "América", "HN": "América", "HU": "Europa", "IN": "Asia", "ID": "Asia", "IQ": "Asia", "IR": "Asia", "IE": "Europa", "IS": "Europa", "IL": "Asia", "IT": "Europa", "JM": "América", "JP": "Asia", "JO": "Asia", "KZ": "Asia", "KE": "África", "KG": "Asia", "KI": "Oceanía", "KW": "Asia", "LA": "Asia", "LS": "África", "LV": "Europa", "LB": "Asia", "LR": "África", "LY": "África", "LI": "Europa", "LT": "Europa", "LU": "Europa", "MK": "Europa", "MG": "África", "MY": "Asia", "MW": "África", "MV": "Asia", "ML": "África", "MT": "Europa", "MA": "África", "MU": "África", "MR": "África", "MX": "América", "FM": "Oceanía", "MD": "Europa", "MC": "Europa", "MN": "Asia", "ME": "Europa", "MZ": "África", "NA": "África", "NR": "Oceanía", "NP": "Asia", "NI": "América", "NE": "África", "NG": "África", "NO": "Europa", "NZ": "Oceanía", "OM": "Asia", "NL": "Europa", "PK": "Asia", "PW": "Oceanía", "PA": "América", "PG": "Oceanía", "PY": "América", "PE": "América", "PL": "Europa", "PT": "Europa", "GB": "Europa", "CF": "África", "CZ": "Europa", "CG": "África", "CD": "África", "DO": "América", "RW": "África", "RO": "Europa", "RU": "Europa", "WS": "Oceanía", "KN": "América", "SM": "Europa", "VC": "América", "LC": "América", "ST": "África", "SN": "África", "RS": "Europa", "SC": "África", "SL": "África", "SG": "Asia", "SY": "Asia", "SO": "África", "LK": "Asia", "SZ": "África", "ZA": "África", "SD": "África", "SS": "África", "SE": "Europa", "CH": "Europa", "SR": "América", "TH": "Asia", "TZ": "África", "TJ": "Asia", "TL": "Asia", "TG": "África", "TO": "Oceanía", "TT": "América", "TN": "África", "TM": "Asia", "TR": "Asia", "TV": "Oceanía", "UA": "Europa", "UG": "África", "UY": "América", "UZ": "Asia", "VU": "Oceanía", "VE": "América", "VN": "Asia", "YE": "Asia", "DJ": "África", "ZM": "África", "ZW": "África"
+        };
+
+        /* === ESTADOS GLOBALES === */
+        let listaPaisesGlobal = [];
+        let ordenContinentes = ['Europa', 'Asia', 'América', 'África', 'Oceanía'];
+        let ordenarVisitadosPrimero = false; 
+        let modoRegistro = false; 
+
+        const CLAVE_ORDEN_CONTINENTES = 'atlas_orden_continentes_v1';
+        const CLAVE_MODO_OSCURO = 'atlas_modo_oscuro_v1';
+
+        /* === EVENTOS INICIALES === */
+        document.addEventListener('DOMContentLoaded', () => {
+            configurarModoOscuro();
+            renderizarSvgEnContenedores();
+            configurarEventosNavegacion();
+            configurarEventosBusqueda();
+            configurarEventosZoom();
+            configurarPantallaContinentes();
+            configurarEventosLogin();
+            
+            // Vigilar si el usuario entra o sale
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    document.getElementById('pantalla-login').classList.remove('activa');
+                    cargarDatosDesdeNube(user.uid);
+                } else {
+                    document.getElementById('pantalla-login').classList.add('activa');
+                    listaPaisesGlobal = []; 
+                }
+            });
+        });
+
+        /* === LÓGICA DE FIREBASE (NUBE) === */
+        function cargarDatosDesdeNube(uid) {
+            const basePaises = (typeof PAISES_BASE !== 'undefined') ? PAISES_BASE : [];
+            
+            db.collection('usuarios').doc(uid).get().then((doc) => {
+                let idsVisitados = [];
+                if (doc.exists && doc.data().visitados) {
+                    idsVisitados = doc.data().visitados;
+                }
+
+                listaPaisesGlobal = basePaises.map(p => ({
+                    ...p,
+                    visitado: idsVisitados.includes(p.id),
+                    continente: MAPA_CONTINENTES[p.id] || "Otro"
+                }));
+                listaPaisesGlobal.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+                const ordenJSON = localStorage.getItem(CLAVE_ORDEN_CONTINENTES);
+                if (ordenJSON) {
+                    try { ordenContinentes = JSON.parse(ordenJSON); } catch (e) {}
+                }
+
+                actualizarInterfaceCompleta();
+            }).catch((error) => {
+                console.error("Error cargando países:", error);
+                alert("Hubo un error cargando tus datos.");
+            });
+        }
+
+        function guardarDatosEnNube() {
+            const user = auth.currentUser;
+            if (user) {
+                const idsVisitados = listaPaisesGlobal.filter(p => p.visitado).map(p => p.id);
+                db.collection('usuarios').doc(user.uid).set({
+                    visitados: idsVisitados
+                }, { merge: true }).catch((error) => {
+                    console.error("Error guardando:", error);
+                });
+            }
+        }
+
+        function cambiarEstadoPais(idPais) {
+            const pais = listaPaisesGlobal.find(p => p.id === idPais);
+            if (pais) {
+                pais.visitado = !pais.visitado;
+                guardarDatosEnNube(); // Ahora guardamos en Firebase
+                actualizarInterfaceCompleta();
+            }
+        }
+
+        /* === LÓGICA DE LOGIN Y REGISTRO === */
+        function configurarEventosLogin() {
+            const btnSubmit = document.getElementById('btn-login-submit');
+            const btnCambiar = document.getElementById('btn-cambiar-modo-login');
+            const emailInput = document.getElementById('login-email');
+            const passInput = document.getElementById('login-password');
+
+            btnCambiar.addEventListener('click', () => {
+                modoRegistro = !modoRegistro;
+                if (modoRegistro) {
+                    btnSubmit.textContent = "Crear cuenta";
+                    document.getElementById('login-subtitulo').textContent = "Crea una cuenta nueva para empezar";
+                    document.getElementById('texto-pregunta-login').textContent = "¿Ya tienes cuenta?";
+                    btnCambiar.textContent = "Inicia sesión";
+                } else {
+                    btnSubmit.textContent = "Entrar";
+                    document.getElementById('login-subtitulo').textContent = "Inicia sesión para guardar tus viajes";
+                    document.getElementById('texto-pregunta-login').textContent = "¿No tienes cuenta?";
+                    btnCambiar.textContent = "Regístrate";
+                }
+            });
+
+            btnSubmit.addEventListener('click', () => {
+                const email = emailInput.value.trim();
+                const password = passInput.value.trim();
+
+                if (!email || !password) return alert("Por favor, rellena tu correo y contraseña.");
+
+                if (modoRegistro) {
+                    auth.createUserWithEmailAndPassword(email, password)
+                        .catch((error) => alert("Error al registrar: " + error.message));
+                } else {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .catch((error) => alert("Error al entrar: Correo o contraseña incorrectos."));
+                }
+            });
+
+            // Lógica Cerrar Sesión
+            document.getElementById('btn-cerrar-sesion').addEventListener('click', () => {
+                if (confirm("¿Estás seguro de que quieres cerrar la sesión?")) {
+                    auth.signOut().then(() => {
+                        cambiarPestaña('mapa');
+                        emailInput.value = '';
+                        passInput.value = '';
+                    });
+                }
+            });
+        }
+
+        /* === LÓGICA VISUAL (MODO OSCURO, ETC) === */
+        function configurarModoOscuro() {
+            const domToggleOscuro = document.getElementById('toggle-modo-oscuro');
+            const preferencia = localStorage.getItem(CLAVE_MODO_OSCURO);
+            if (preferencia === 'true') {
+                document.body.classList.add('dark-mode');
+                domToggleOscuro.checked = true;
+            }
+            domToggleOscuro.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem(CLAVE_MODO_OSCURO, 'true');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem(CLAVE_MODO_OSCURO, 'false');
+                }
+            });
+        }
+
+        function renderizarSvgEnContenedores() {
+            const svgCodigo = (typeof SVG_MAPA_CODIGO !== 'undefined') ? SVG_MAPA_CODIGO : '';
+            document.getElementById('svg-mapa-estatico-wrapper').innerHTML = svgCodigo;
+            document.getElementById('wrapper-mapa-zoom').innerHTML = svgCodigo;
+        }
+
+        function cambiarPestaña(nuevaPestaña) {
+            document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+            document.querySelectorAll('.nav-item-btn').forEach(b => b.classList.remove('activo'));
+            document.getElementById(`pantalla-${nuevaPestaña}`).classList.add('activa');
+            if(nuevaPestaña !== 'ajustes') document.getElementById(`nav-btn-${nuevaPestaña === 'lista' ? 'list' : 'map'}`).classList.add('activo');
+        }
+
+        function configurarEventosNavegacion() {
+            document.getElementById('nav-btn-map').addEventListener('click', () => cambiarPestaña('mapa'));
+            document.getElementById('nav-btn-list').addEventListener('click', () => cambiarPestaña('lista'));
+            document.getElementById('btn-ajustes').addEventListener('click', () => cambiarPestaña('ajustes'));
+        }
+
+        function renderizarListaPaises() {
+            const domInputBusqueda = document.getElementById('input-busqueda-pais');
+            const domListaPaisesUl = document.getElementById('lista-paises-ul');
+            const termino = domInputBusqueda.value.toLowerCase().trim();
+            domListaPaisesUl.innerHTML = '';
+
+            let listaFiltrada = listaPaisesGlobal.filter(p => p.nombre.toLowerCase().includes(termino));
+
+            if (ordenarVisitadosPrimero) {
+                listaFiltrada.sort((a, b) => {
+                    if (a.visitado && !b.visitado) return -1;
+                    if (!a.visitado && b.visitado) return 1;
+                    return a.nombre.localeCompare(b.nombre, 'es'); 
+                });
+            } else {
+                listaFiltrada.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+            }
+
+            listaFiltrada.forEach(pais => {
+                const li = document.createElement('li');
+                li.className = 'item-pais';
+                li.onclick = () => cambiarEstadoPais(pais.id);
+
+                const nombre = document.createElement('span');
+                nombre.className = 'nombre-pais'; 
+                nombre.textContent = pais.nombre;
+                li.appendChild(nombre); 
+
+                if (pais.visitado) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge-estado estado-visited';
+                    badge.textContent = 'Visited';
+                    li.appendChild(badge);
+                }
+                domListaPaisesUl.appendChild(li);
+            });
+        }
+
+        function configurarEventosBusqueda() {
+            const domInputBusqueda = document.getElementById('input-busqueda-pais');
+            const domBtnLimpiarBusqueda = document.getElementById('btn-limpiar-busqueda');
+            const domBtnOrdenarLista = document.getElementById('btn-ordenar-lista');
+
+            domInputBusqueda.addEventListener('input', () => {
+                domBtnLimpiarBusqueda.style.display = domInputBusqueda.value.length > 0 ? 'flex' : 'none';
+                renderizarListaPaises();
+            });
+            domBtnLimpiarBusqueda.addEventListener('click', () => {
+                domInputBusqueda.value = '';
+                domBtnLimpiarBusqueda.style.display = 'none';
+                domInputBusqueda.focus();
+                renderizarListaPaises();
+            });
+            domBtnOrdenarLista.addEventListener('click', () => {
+                ordenarVisitadosPrimero = !ordenarVisitadosPrimero;
+                domBtnOrdenarLista.classList.toggle('activo', ordenarVisitadosPrimero);
+                renderizarListaPaises();
+            });
+        }
+
+        function actualizarInterfaceCompleta() {
+            renderizarListaPaises();
+            actualizarColoresMapas();
+            actualizarEstadisticas();
+            renderizarBarrasContinentes();
+        }
+
+        function actualizarColoresMapas() {
+            listaPaisesGlobal.forEach(pais => {
+                const elementosSvg = document.querySelectorAll(`[data-id="${pais.id}"], #${pais.id}`);
+                elementosSvg.forEach(el => el.classList.toggle('visitado', pais.visitado));
+            });
+        }
+
+        function actualizarEstadisticas() {
+            const total = listaPaisesGlobal.length;
+            const visitados = listaPaisesGlobal.filter(p => p.visitado).length;
+            const porcentaje = total > 0 ? Math.round((visitados / total) * 100) : 0;
+
+            document.getElementById('metrica-total-visitados').textContent = `${visitados}`;
+            document.getElementById('metrica-porcentaje-visitados').textContent = `${porcentaje}%`;
+            document.getElementById('metrica-total-visitados-clon').textContent = `${visitados}`;
+            document.getElementById('metrica-porcentaje-visitados-clon').textContent = `${porcentaje}%`;
+
+            const gradosAzul = (porcentaje / 100) * 360;
+            const estiloFondo = `conic-gradient(var(--color-acento-azul) 0deg ${gradosAzul}deg, var(--color-no-visitado) ${gradosAzul}deg 360deg)`;
+            
+            document.getElementById('grafico-pie').style.background = estiloFondo;
+            document.getElementById('grafico-pie-clon').style.background = estiloFondo;
+        }
+
+        function configurarPantallaContinentes() {
+            const domPantallaStatsContinentes = document.getElementById('pantalla-estadisticas-detalle');
+            const domListaContinentesDrag = document.getElementById('lista-continentes-drag');
+
+            document.getElementById('btn-abrir-stats-continentes').addEventListener('click', () => domPantallaStatsContinentes.classList.add('activa'));
+            document.getElementById('btn-cerrar-stats-continentes').addEventListener('click', () => domPantallaStatsContinentes.classList.remove('activa'));
+
+            new Sortable(domListaContinentesDrag, {
+                animation: 150, 
+                handle: '.drag-handle', 
+                delay: 150, 
+                delayOnTouchOnly: true,
+                onEnd: function () {
+                    const nuevosElementos = Array.from(domListaContinentesDrag.children);
+                    ordenContinentes = nuevosElementos.map(li => li.getAttribute('data-continente'));
+                    localStorage.setItem(CLAVE_ORDEN_CONTINENTES, JSON.stringify(ordenContinentes));
+                }
+            });
+        }
+
+        function renderizarBarrasContinentes() {
+            const domListaContinentesDrag = document.getElementById('lista-continentes-drag');
+            domListaContinentesDrag.innerHTML = '';
+
+            ordenContinentes.forEach(continenteNombre => {
+                const paisesDelContinente = listaPaisesGlobal.filter(p => p.continente === continenteNombre);
+                if (paisesDelContinente.length === 0) return;
+
+                const totalContinente = paisesDelContinente.length;
+                const visitadosContinente = paisesDelContinente.filter(p => p.visitado).length;
+                const porcentaje = Math.round((visitadosContinente / totalContinente) * 100);
+
+                const li = document.createElement('li');
+                li.className = 'tarjeta-continente';
+                li.setAttribute('data-continente', continenteNombre);
+
+                li.innerHTML = `
+                    <div class="drag-handle">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
+                        </svg>
+                    </div>
+                    <div class="continente-info">
+                        <div class="continente-header">
+                            <div>
+                                <span class="continente-nombre">${continenteNombre}</span>
+                                <span class="continente-fraccion"> • ${visitadosContinente} / ${totalContinente}</span>
+                            </div>
+                            <span class="continente-porcentaje">${porcentaje}%</span>
+                        </div>
+                        <div class="barra-progreso-bg">
+                            <div class="barra-progreso-fill" style="width: ${porcentaje}%"></div>
+                        </div>
+                    </div>
+                `;
+                domListaContinentesDrag.appendChild(li);
+            });
+        }
+
+        const handlerGestosMovil = {
+            haltEventListeners: ['touchstart', 'touchend', 'touchmove', 'touchleave', 'touchcancel'],
+            init: function(options) {
+                let instance = options.instance, initialScale = 1, pannedX = 0, pannedY = 0;
+                this.hammer = Hammer(options.svgElement, { recognizers: [[Hammer.Pan, {direction: Hammer.DIRECTION_ALL}], [Hammer.Pinch]] });
+                
+                this.hammer.on('panstart panmove', function(ev){
+                    if (ev.type === 'panstart') { pannedX = 0; pannedY = 0; }
+                    instance.panBy({x: ev.deltaX - pannedX, y: ev.deltaY - pannedY});
+                    pannedX = ev.deltaX; pannedY = ev.deltaY;
+                });
+                
+                this.hammer.on('pinchstart pinchmove', function(ev){
+                    if (ev.type === 'pinchstart') {
+                        initialScale = instance.getZoom();
+                    }
+                    let escalaDestino = initialScale * ev.scale;
+                    escalaDestino = Math.max(0.8, Math.min(escalaDestino, 10)); // Tope matemático del zoom
+                    instance.zoomAtPoint(escalaDestino, {x: ev.center.x, y: ev.center.y});
+                });
+                options.svgElement.addEventListener('touchmove', function(e){ e.preventDefault(); }, {passive: false});
+            },
+            destroy: function(){ this.hammer.destroy(); }
+        };
+
+        function configurarEventosZoom() {
+            const domModoZoomOverlay = document.getElementById('modo-zoom-overlay');
+            const domBarraNavegacion = document.getElementById('barra-navegacion');
+            let instanciaSvgPanZoom = null;
+
+            document.getElementById('btn-abrir-zoom').addEventListener('click', () => {
+                domModoZoomOverlay.classList.add('activo');
+                domBarraNavegacion.style.display = 'none'; 
+
+                const svgElem = document.getElementById('wrapper-mapa-zoom').querySelector('svg');
+                if (svgElem && typeof svgPanZoom !== 'undefined') {
+                    if (instanciaSvgPanZoom) instanciaSvgPanZoom.destroy();
+                    instanciaSvgPanZoom = svgPanZoom(svgElem, {
+                        zoomEnabled: true, controlIconsEnabled: false, fit: true, center: true, minZoom: 0.8, maxZoom: 10,
+                        customEventsHandler: handlerGestosMovil,
+                        beforePan: function(oldPan, newPan) {
+                            const sizes = this.getSizes();
+                            const gutterWidth = sizes.width * 0.3;
+                            const gutterHeight = sizes.height * 0.3;
+                            const leftLimit = -((sizes.viewBox.x + sizes.viewBox.width) * sizes.realZoom) + gutterWidth;
+                            const rightLimit = sizes.width - gutterWidth - (sizes.viewBox.x * sizes.realZoom);
+                            const topLimit = -((sizes.viewBox.y + sizes.viewBox.height) * sizes.realZoom) + gutterHeight;
+                            const bottomLimit = sizes.height - gutterHeight - (sizes.viewBox.y * sizes.realZoom);
+
+                            return {
+                                x: Math.max(leftLimit, Math.min(rightLimit, newPan.x)),
+                                y: Math.max(topLimit, Math.min(bottomLimit, newPan.y))
+                            };
+                        }
+                    });
+                }
+            });
+
+            document.getElementById('btn-cerrar-zoom').addEventListener('click', () => {
+                domModoZoomOverlay.classList.remove('activo');
+                domBarraNavegacion.style.display = 'flex'; 
+                if (instanciaSvgPanZoom) { instanciaSvgPanZoom.destroy(); instanciaSvgPanZoom = null; }
+            });
+        }
+    </script>
+</body>
+</html>
